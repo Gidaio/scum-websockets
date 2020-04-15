@@ -1,9 +1,15 @@
 interface AppState {
-	page: "login" | "game"
+	page: "login" | "waitingRoom" | "game"
 	socket?: WebSocket
 	username?: string
 	loginState?: {
 		loginError: string
+	}
+	waitingRoomState?: {
+		readyStates: {
+			[username: string]: boolean
+		}
+		ready: boolean
 	}
 }
 
@@ -14,6 +20,11 @@ const loginSection = document.getElementById("login") as HTMLDivElement
 const loginUsernameInput = document.getElementById("login-username") as HTMLInputElement
 const loginSubmitButton = document.getElementById("login-submit") as HTMLButtonElement
 const loginErrorParagraph = document.getElementById("login-error") as HTMLParagraphElement
+
+const waitingRoomSection = document.getElementById("waiting-room") as HTMLDivElement
+const waitingRoomPlayersDiv = document.getElementById("waiting-room-players") as HTMLDivElement
+const waitingRoomReadyToggleButton = document.getElementById("waiting-room-ready-toggle") as HTMLButtonElement
+const waitingRoomStartGameButton = document.getElementById("waiting-room-start-game") as HTMLButtonElement
 
 const gameSection = document.getElementById("game") as HTMLDivElement
 
@@ -70,6 +81,32 @@ loginSubmitButton.addEventListener("click", () => {
 	})
 })
 
+waitingRoomReadyToggleButton.addEventListener("click", () => {
+	if (appState.page !== "waitingRoom") {
+		console.warn("Wrong state to toggle ready state!")
+		return
+	}
+
+	if (!appState.waitingRoomState) {
+		console.error("Somehow the state is missing...")
+		return
+	}
+
+	send({
+		type: "setReadyState",
+		ready: !appState.waitingRoomState.ready
+	})
+})
+
+waitingRoomStartGameButton.addEventListener("click", () => {
+	if (appState.page !== "waitingRoom") {
+		console.warn("Incorrect page to request game start!")
+		return
+	}
+
+	send({ type: "requestGameStart" })
+})
+
 
 function handleSocketMessage(event: MessageEvent) {
 	console.info("Message received!")
@@ -83,6 +120,11 @@ function handleSocketMessage(event: MessageEvent) {
 				handleLoginMessage(message)
 				break
 			}
+
+			case "waitingRoom": {
+				handleWaitingRoomMessage(message)
+				break
+			}
 		}
 	}
 
@@ -93,8 +135,31 @@ function handleSocketMessage(event: MessageEvent) {
 		switch (message.type) {
 			case "loginAccepted": {
 				appState.username = message.username
-				appState.page = "game"
+				appState.page = "waitingRoom"
+				send({
+					type: "setReadyState",
+					ready: false
+				})
 
+				break
+			}
+		}
+	}
+
+	function handleWaitingRoomMessage(message: ServerToClientMessage): void {
+		switch (message.type) {
+			case "readyStateChange": {
+				appState.waitingRoomState = {
+					readyStates: message.readyStates,
+					ready: message.readyStates[appState.username!]
+				}
+
+				break
+			}
+
+			case "gameStart": {
+				appState.page = "game"
+				delete appState.waitingRoomState
 				break
 			}
 		}
@@ -106,6 +171,7 @@ function render() {
 	console.info("Rendering...")
 
 	loginSection.hidden = true
+	waitingRoomSection.hidden = true
 	gameSection.hidden = true
 
 	switch (appState.page) {
@@ -113,6 +179,23 @@ function render() {
 			loginSection.hidden = false
 			if (appState.loginState) {
 				loginErrorParagraph.innerHTML = appState.loginState.loginError
+			}
+
+			break
+		}
+
+		case "waitingRoom": {
+			waitingRoomSection.hidden = false
+			if (appState.waitingRoomState) {
+				const { ready, readyStates } = appState.waitingRoomState
+				let playerReadyStatesHTML = ""
+				for (const username in readyStates) {
+					playerReadyStatesHTML += `<p>${username}: ${readyStates[username] ? "Ready" : "Not Ready"}</p>`
+				}
+
+				waitingRoomPlayersDiv.innerHTML = playerReadyStatesHTML
+
+				waitingRoomReadyToggleButton.innerHTML = ready ? "I'm Not Ready" : "I'm Ready"
 			}
 
 			break

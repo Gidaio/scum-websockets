@@ -1,22 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Scum</title>
+	<title>Scum</title>
 </head>
 
 <body>
-  <h1>Scum!</h1>
+	<h1>Scum</h1>
 
-  <div id="login" hidden>
-    <input id="login-username" type="text">
-    <button id="login-submit" type="button">Login</button>
-    <p id="login-error"></p>
-  </div>
+	<div id="login" hidden>
+		<input id="login-username" type="text">
+		<button id="login-submit" type="button">Login</button>
+		<p id="login-error"></p>
+	</div>
 
-  <div id="game" hidden>
-    <p>You're connected!</p>
-  </div>
+	<div id="waiting-room" hidden>
+		<div id="waiting-room-players"></div>
+		<button id="waiting-room-ready-toggle"></button>
+		<button id="waiting-room-start-game">Start Game</button>
+	</div>
 
-  <script src="scum.js"></script>
+	<div id="game" hidden>
+		<p>You're in a game!</p>
+	</div>
+
+	<script src="scum.js"></script>
 </body>
 </html>
