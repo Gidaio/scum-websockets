@@ -1,1 +1,21 @@
-{}
+{
+  "name": "scum-websockets",
+  "description": "A browser version of the card game Scum utilizing WebSockets.",
+  "author": "Tanis Kint",
+  "repository": {
+    "type": "github",
+    "url": "https://github.com/Gidaio/scum-websockets"
+  },
+  "scripts": {
+    "start": "node out/index.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "ws": "^7.2.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.6",
+    "@types/node": "^12.12.35",
+    "@types/ws": "^7.2.4"
+  }
+}
