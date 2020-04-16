@@ -5,12 +5,37 @@ class ServerState {
 	public users: User[] = []
 	public status: "waiting" | "playing" = "waiting"
 
+	public playerOrder: string[] = []
+	public currentPlayerIndex = 0
+
 	public get userCount() {
 		return Object.keys(this.users).length
 	}
 
 	public addUser(user: User): void {
 		this.users.push(user)
+	}
+
+	public initGame(): void {
+		if (this.playerOrder.length === 0) {
+			this.playerOrder = shuffle(this.users.map(user => user.username))
+		}
+
+		let deck = []
+		for (let times = 0; times < (Math.ceil(this.users.length / 5)); times++) {
+			for (const suit of ["C", "D", "H", "S"]) {
+				for (let rank = 1; rank <= 13; rank++) {
+					deck.push(`${rank.toString().padStart(2, "0")}${suit}`)
+				}
+			}
+		}
+		deck = shuffle(deck)
+
+		for (let userIndex = 0; userIndex < this.users.length; userIndex++) {
+			const usersRemaining = this.users.length - userIndex
+			const cardsForUser = Math.ceil(deck.length / usersRemaining)
+			this.users[userIndex].hand = deck.splice(0, cardsForUser)
+		}
 	}
 
 	public broadcast<T extends ServerToClientMessage>(message: T): void {
@@ -25,6 +50,7 @@ class User {
 	private socket: WebSocket
 
 	public ready: boolean = false
+	public hand: string[] = []
 
 	public get username() {
 		return this._username
@@ -141,7 +167,30 @@ function handleWaitingMessage(user: User, message: ClientToServerMessage): void 
 			}
 
 			serverState.status = "playing"
-			serverState.broadcast({ type: "gameStart"  })
+			serverState.initGame()
+			serverState.users.forEach(user => {
+				user.send({
+					type: "gameStart",
+					players: serverState.playerOrder,
+					hand: user.hand
+				})
+			})
+
+			break
 		}
 	}
+}
+
+
+function shuffle<T>(array: T[]): T[] {
+	const shuffledArray = [...array]
+
+	for (let i = shuffledArray.length - 1; i > 0; i--) {
+		let indexToSwap = Math.floor(Math.random() * i)
+		const temp = shuffledArray[i]
+		shuffledArray[i] = shuffledArray[indexToSwap]
+		shuffledArray[indexToSwap] = temp
+	}
+
+	return shuffledArray
 }

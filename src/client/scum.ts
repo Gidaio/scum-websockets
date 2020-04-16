@@ -11,6 +11,10 @@ interface AppState {
 		}
 		ready: boolean
 	}
+	gameState?: {
+		players: string[]
+		hand: string[]
+	}
 }
 
 
@@ -27,6 +31,9 @@ const waitingRoomReadyToggleButton = document.getElementById("waiting-room-ready
 const waitingRoomStartGameButton = document.getElementById("waiting-room-start-game") as HTMLButtonElement
 
 const gameSection = document.getElementById("game") as HTMLDivElement
+const gamePlayersDiv = document.getElementById("game-players") as HTMLDivElement
+const gameBoardDiv = document.getElementById("game-board") as HTMLDivElement
+const gameHandDiv = document.getElementById("game-hand") as HTMLDivElement
 
 
 const appState: AppState = {
@@ -158,8 +165,13 @@ function handleSocketMessage(event: MessageEvent) {
 			}
 
 			case "gameStart": {
-				appState.page = "game"
 				delete appState.waitingRoomState
+				appState.page = "game"
+				appState.gameState = {
+					players: message.players,
+					hand: message.hand
+				}
+
 				break
 			}
 		}
@@ -203,6 +215,13 @@ function render() {
 
 		case "game": {
 			gameSection.hidden = false
+			if (appState.gameState) {
+				gamePlayersDiv.innerHTML = appState.gameState.players
+					.reduce<string>((html, player) => html + `<p>${player}</p>`, "")
+
+				gameHandDiv.innerHTML = appState.gameState.hand.join(", ")
+			}
+
 			break
 		}
 

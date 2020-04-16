@@ -17,6 +17,8 @@ interface ReadyStateChange {
 
 interface GameStart {
 	type: "gameStart"
+	players: string[]
+	hand: string[]
 }
 
 interface BadRequest {
