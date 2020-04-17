@@ -7,6 +7,14 @@ class ServerState {
 
 	public playerOrder: string[] = []
 	public currentPlayerIndex = 0
+	public board: { lastPlayer: string, cards: string[] } = {
+		lastPlayer: "",
+		cards: []
+	}
+
+	public get currentPlayer() {
+		return this.playerOrder[this.currentPlayerIndex]
+	}
 
 	public get userCount() {
 		return Object.keys(this.users).length
@@ -21,6 +29,7 @@ class ServerState {
 			this.playerOrder = shuffle(this.users.map(user => user.username))
 		}
 
+		// TODO: Needs to rotate who the deal "starts" with, i.e. who gets more cards.
 		let deck = []
 		for (let times = 0; times < (Math.ceil(this.users.length / 5)); times++) {
 			for (const suit of ["C", "D", "H", "S"]) {
@@ -51,6 +60,7 @@ class User {
 
 	public ready: boolean = false
 	public hand: string[] = []
+	public passed: boolean = false
 
 	public get username() {
 		return this._username
@@ -76,7 +86,7 @@ class User {
 }
 
 
-const serverState = new ServerState
+const serverState = new ServerState()
 
 
 export function scumController(wsServer: WebSocket.Server) {
@@ -93,6 +103,11 @@ export function scumController(wsServer: WebSocket.Server) {
 				switch (serverState.status) {
 					case "waiting": {
 						handleWaitingMessage(user, message)
+						break
+					}
+
+					case "playing": {
+						handlePlayingMessage(user, message)
 						break
 					}
 				}
@@ -172,11 +187,100 @@ function handleWaitingMessage(user: User, message: ClientToServerMessage): void 
 				user.send({
 					type: "gameStart",
 					players: serverState.playerOrder,
+					currentPlayer: serverState.playerOrder[serverState.currentPlayerIndex],
+					board: serverState.board,
 					hand: user.hand
 				})
 			})
 
 			break
+		}
+	}
+}
+
+
+function handlePlayingMessage(user: User, message: ClientToServerMessage): void {
+	switch (message.type) {
+		case "playCards": {
+			if (user.username !== serverState.currentPlayer) {
+				user.send({
+					type: "badRequest",
+					error: "It's not your turn!"
+				})
+
+				break
+			}
+
+			if (serverState.board.cards.length > 0 && message.cards.length !== serverState.board.cards.length) {
+				user.send({
+					type: "badRequest",
+					error: "You must play the same number of cards as are in the middle!"
+				})
+
+				break
+			}
+
+			const cardRank = message.cards[0].slice(0, 2)
+			if (!message.cards.every(card => card.slice(0, 2) === cardRank)) {
+				user.send({
+					type: "badRequest",
+					error: "All played cards must be of the same rank."
+				})
+
+				break
+			}
+
+			if (serverState.board.cards.length > 0) {
+				const boardRank = serverState.board.cards[0].slice(0, 2)
+				if (Number(cardRank) <= Number(boardRank)) {
+					user.send({
+						type: "badRequest",
+						error: "You must exceed the rank of the cards in the middle!"
+					})
+
+					break
+				}
+			}
+
+			const newHand = [...user.hand]
+			for (const card of message.cards) {
+				const cardIndex = newHand.findIndex(newHandCard => newHandCard === card)
+				if (cardIndex === -1) {
+					user.send({
+						type: "badRequest",
+						error: `You don't have the card ${card}!`
+					})
+
+					return
+				}
+
+				newHand.splice(cardIndex, 1)
+			}
+
+			user.hand = newHand
+
+			if (cardRank === "13") {
+
+			} else {
+				do {
+					serverState.currentPlayerIndex = (serverState.currentPlayerIndex + 1) % serverState.playerOrder.length
+				} while (serverState.users.find(user => user.username === serverState.currentPlayer)!.passed)
+
+				serverState.board = {
+					cards: message.cards,
+					lastPlayer: user.username
+				}
+
+				serverState.users.forEach(user => {
+					user.send({
+						type: "gameStateChange",
+						players: serverState.playerOrder,
+						currentPlayer: serverState.currentPlayer,
+						board: serverState.board,
+						hand: user.hand
+					})
+				})
+			}
 		}
 	}
 }

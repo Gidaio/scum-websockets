@@ -1,6 +1,6 @@
 // Server to client message
 
-type ServerToClientMessage = LoginAccepted | ReadyStateChange | GameStart | BadRequest
+type ServerToClientMessage = LoginAccepted | ReadyStateChange | GameStart | GameStateChange | BadRequest
 
 
 interface LoginAccepted {
@@ -15,11 +15,9 @@ interface ReadyStateChange {
 	}
 }
 
-interface GameStart {
-	type: "gameStart"
-	players: string[]
-	hand: string[]
-}
+type GameStart = { type: "gameStart" } & GameState
+
+type GameStateChange = { type: "gameStateChange" } & GameState
 
 interface BadRequest {
 	type: "badRequest"
@@ -27,9 +25,20 @@ interface BadRequest {
 }
 
 
+interface GameState {
+	players: string[]
+	currentPlayer: string
+	board: {
+		lastPlayer: string
+		cards: string[]
+	}
+	hand: string[]
+}
+
+
 // Client to server messages
 
-type ClientToServerMessage = LoginRequest | SetReadyState | RequestGameStart
+type ClientToServerMessage = LoginRequest | SetReadyState | RequestGameStart | PlayCards | Pass
 
 
 interface LoginRequest {
@@ -44,4 +53,13 @@ interface SetReadyState {
 
 interface RequestGameStart {
 	type: "requestGameStart"
+}
+
+interface PlayCards {
+	type: "playCards"
+	cards: string[]
+}
+
+interface Pass {
+	type: "pass"
 }

@@ -13,6 +13,11 @@ interface AppState {
 	}
 	gameState?: {
 		players: string[]
+		currentPlayer: string
+		board: {
+			lastPlayer: string
+			cards: string[]
+		}
 		hand: string[]
 	}
 }
@@ -34,6 +39,8 @@ const gameSection = document.getElementById("game") as HTMLDivElement
 const gamePlayersDiv = document.getElementById("game-players") as HTMLDivElement
 const gameBoardDiv = document.getElementById("game-board") as HTMLDivElement
 const gameHandDiv = document.getElementById("game-hand") as HTMLDivElement
+const gamePlayCardsButton = document.getElementById("game-play-cards") as HTMLButtonElement
+const gamePassButton = document.getElementById("game-pass") as HTMLButtonElement
 
 
 const appState: AppState = {
@@ -114,6 +121,58 @@ waitingRoomStartGameButton.addEventListener("click", () => {
 	send({ type: "requestGameStart" })
 })
 
+gamePlayCardsButton.addEventListener("click", () => {
+	if (appState.page !== "game") {
+		console.warn("Incorrect page to play cards!")
+		return
+	}
+
+	if (!appState.gameState) {
+		console.error("No game state somehow!")
+		return
+	}
+
+	if (appState.username !== appState.gameState.currentPlayer) {
+		console.warn("It's not your turn!")
+		return
+	}
+
+	const selectedCards: string[] = []
+	for (const element of Array.from(gameHandDiv.children)) {
+		if (element.tagName !== "INPUT") {
+			continue
+		}
+
+		if ((element as HTMLInputElement).checked) {
+			selectedCards.push(element.id)
+		}
+	}
+
+	if (appState.gameState.board.cards.length > 0 && appState.gameState.board.cards.length !== selectedCards.length) {
+		console.warn("You must play the same number of cards as are in the middle!")
+		return
+	}
+
+	const cardRank = selectedCards[0].slice(0, 2)
+	if (!selectedCards.every(card => card.slice(0, 2) === cardRank)) {
+		console.warn("All played cards must be of the same rank.")
+		return
+	}
+
+	if (appState.gameState.board.cards.length > 0) {
+		const boardRank = appState.gameState.board.cards[0].slice(0, 2)
+		if (Number(cardRank) <= Number(boardRank)) {
+			console.warn("You must exceed the rank of the cards in the middle!")
+			return
+		}
+	}
+
+	send({
+		type: "playCards",
+		cards: selectedCards
+	})
+})
+
 
 function handleSocketMessage(event: MessageEvent) {
 	console.info("Message received!")
@@ -130,6 +189,11 @@ function handleSocketMessage(event: MessageEvent) {
 
 			case "waitingRoom": {
 				handleWaitingRoomMessage(message)
+				break
+			}
+
+			case "game": {
+				handleGameMessage(message)
 				break
 			}
 		}
@@ -169,6 +233,23 @@ function handleSocketMessage(event: MessageEvent) {
 				appState.page = "game"
 				appState.gameState = {
 					players: message.players,
+					currentPlayer: message.currentPlayer,
+					board: message.board,
+					hand: message.hand
+				}
+
+				break
+			}
+		}
+	}
+
+	function handleGameMessage(message: ServerToClientMessage): void {
+		switch (message.type) {
+			case "gameStateChange": {
+				appState.gameState = {
+					players: message.players,
+					currentPlayer: message.currentPlayer,
+					board: message.board,
 					hand: message.hand
 				}
 
@@ -216,10 +297,26 @@ function render() {
 		case "game": {
 			gameSection.hidden = false
 			if (appState.gameState) {
-				gamePlayersDiv.innerHTML = appState.gameState.players
-					.reduce<string>((html, player) => html + `<p>${player}</p>`, "")
+				const { gameState } = appState
+				gamePlayersDiv.innerHTML = gameState.players.map(player => {
+					let string = player
+					if (player === gameState.currentPlayer) {
+						string = `<strong>${player}</strong>`
+					}
 
-				gameHandDiv.innerHTML = appState.gameState.hand.join(", ")
+					return `<p>${string}</p>`
+				}).join("")
+
+				gameBoardDiv.innerHTML = ""
+				if (gameState.board.cards) {
+					gameBoardDiv.innerHTML =
+						`<p>${gameState.board.cards.join(" ")}</p>` +
+						`<p>Played by ${gameState.board.lastPlayer}</p>`
+				}
+
+				gameHandDiv.innerHTML = appState.gameState.hand.map(card =>
+					`<input id="${card}" type="checkbox"><label for="${card}">${card}</label>`
+				).join(" ")
 			}
 
 			break
