@@ -19,6 +19,7 @@ interface AppState {
 			cards: string[]
 		}
 		hand: string[]
+		roundEnd: boolean
 	}
 }
 
@@ -235,7 +236,8 @@ function handleSocketMessage(event: MessageEvent) {
 					players: message.players,
 					currentPlayer: message.currentPlayer,
 					board: message.board,
-					hand: message.hand
+					hand: message.hand,
+					roundEnd: false
 				}
 
 				break
@@ -250,10 +252,21 @@ function handleSocketMessage(event: MessageEvent) {
 					players: message.players,
 					currentPlayer: message.currentPlayer,
 					board: message.board,
-					hand: message.hand
+					hand: message.hand,
+					roundEnd: false
 				}
 
 				break
+			}
+
+			case "roundEnd": {
+				appState.gameState = {
+					players: message.players,
+					currentPlayer: message.currentPlayer,
+					board: message.board,
+					hand: message.hand,
+					roundEnd: true
+				}
 			}
 		}
 	}
@@ -308,10 +321,10 @@ function render() {
 				}).join("")
 
 				gameBoardDiv.innerHTML = ""
-				if (gameState.board.cards) {
+				if (gameState.board.cards.length) {
 					gameBoardDiv.innerHTML =
 						`<p>${gameState.board.cards.join(" ")}</p>` +
-						`<p>Played by ${gameState.board.lastPlayer}</p>`
+						`<p>${gameState.roundEnd ? "Taken" : "Played"} by ${gameState.board.lastPlayer}</p>`
 				}
 
 				gameHandDiv.innerHTML = appState.gameState.hand.map(card =>

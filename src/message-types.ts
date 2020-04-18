@@ -1,6 +1,6 @@
 // Server to client message
 
-type ServerToClientMessage = LoginAccepted | ReadyStateChange | GameStart | GameStateChange | BadRequest
+type ServerToClientMessage = LoginAccepted | ReadyStateChange | GameStart | GameStateChange | RoundEnd | BadRequest
 
 
 interface LoginAccepted {
@@ -18,6 +18,8 @@ interface ReadyStateChange {
 type GameStart = { type: "gameStart" } & GameState
 
 type GameStateChange = { type: "gameStateChange" } & GameState
+
+type RoundEnd = { type: "roundEnd" } & GameState
 
 interface BadRequest {
 	type: "badRequest"

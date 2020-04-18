@@ -3,7 +3,7 @@ import WebSocket from "ws"
 
 class ServerState {
 	public users: User[] = []
-	public status: "waiting" | "playing" = "waiting"
+	public status: "waiting" | "playing" | "resolvingRound" = "waiting"
 
 	public playerOrder: string[] = []
 	public currentPlayerIndex = 0
@@ -259,17 +259,29 @@ function handlePlayingMessage(user: User, message: ClientToServerMessage): void 
 
 			user.hand = newHand
 
-			if (cardRank === "13") {
+			serverState.board = {
+				cards: message.cards,
+				lastPlayer: user.username
+			}
 
+			if (cardRank === "13") {
+				serverState.status = "resolvingRound"
+
+				serverState.users.forEach(user => {
+					user.send({
+						type: "roundEnd",
+						players: serverState.playerOrder,
+						currentPlayer: serverState.currentPlayer,
+						board: serverState.board,
+						hand: user.hand
+					})
+				})
+
+				setTimeout(beginRound, 1000)
 			} else {
 				do {
 					serverState.currentPlayerIndex = (serverState.currentPlayerIndex + 1) % serverState.playerOrder.length
 				} while (serverState.users.find(user => user.username === serverState.currentPlayer)!.passed)
-
-				serverState.board = {
-					cards: message.cards,
-					lastPlayer: user.username
-				}
 
 				serverState.users.forEach(user => {
 					user.send({
@@ -283,6 +295,26 @@ function handlePlayingMessage(user: User, message: ClientToServerMessage): void 
 			}
 		}
 	}
+}
+
+
+function beginRound() {
+	serverState.board = {
+		cards: [],
+		lastPlayer: ""
+	}
+
+	serverState.status = "playing"
+
+	serverState.users.forEach(user => {
+		user.send({
+			type: "gameStateChange",
+			players: serverState.playerOrder,
+			currentPlayer: serverState.currentPlayer,
+			board: serverState.board,
+			hand: user.hand
+		})
+	})
 }
 
 
