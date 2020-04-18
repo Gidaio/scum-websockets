@@ -11,12 +11,7 @@ interface AppState {
 		}
 		ready: boolean
 	}
-	gameState?: {
-		players: { username: string, passed: boolean }[]
-		currentPlayer: string
-		lastPlayer: string
-		board: string[]
-		hand: string[]
+	gameState?: GameState & {
 		roundEnd: boolean
 	}
 }
@@ -339,6 +334,30 @@ function render() {
 				gamePlayersDiv.innerHTML = gameState.players.map(player => {
 					let out = player.username
 
+					if (player.position !== "neutral") {
+						switch (player.position) {
+							case "king": {
+								out += " &#x265A;"
+								break
+							}
+
+							case "queen": {
+								out += " &#x265B;"
+								break
+							}
+
+							case "vice-scum": {
+								out += " &#x265D;"
+								break
+							}
+
+							case "scum": {
+								out += " &#x265F;"
+								break
+							}
+						}
+					}
+
 					if (player.passed) {
 						out = `<s>${out}</s>`
 					}
@@ -347,7 +366,7 @@ function render() {
 						out = `<strong>${out}</strong>`
 					}
 
-					return `<p>${out}</p>`
+					return `<p${player.finished ? " style=\"color: grey;\"": ""}>${out}</p>`
 				}).join("")
 
 				gameBoardDiv.innerHTML = ""

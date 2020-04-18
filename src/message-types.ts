@@ -27,15 +27,6 @@ interface BadRequest {
 }
 
 
-interface GameState {
-	players: { username: string, passed: boolean }[]
-	currentPlayer: string
-	lastPlayer: string
-	board: string[]
-	hand: string[]
-}
-
-
 // Client to server messages
 
 type ClientToServerMessage = LoginRequest | SetReadyState | RequestGameStart | PlayCards | Pass
@@ -63,3 +54,23 @@ interface PlayCards {
 interface Pass {
 	type: "pass"
 }
+
+
+// Miscellaneous Types
+
+interface GameState {
+	players: Player[]
+	currentPlayer: string
+	lastPlayer: string
+	board: string[]
+	hand: string[]
+}
+
+interface Player {
+	username: string
+	position: ScumPosition
+	passed: boolean
+	finished: boolean
+}
+
+type ScumPosition = "king" | "queen" | "neutral" | "vice-scum" | "scum"

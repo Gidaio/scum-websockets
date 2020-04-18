@@ -8,6 +8,7 @@ export class User {
 	public ready: boolean = false
 	public hand: string[] = []
 	public passed: boolean = false
+	public position: ScumPosition = "neutral"
 
 	public get username() {
 		return this._username

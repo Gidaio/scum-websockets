@@ -7,14 +7,21 @@ export class ServerState {
 
 	public playerOrder: string[] = []
 	public currentPlayerIndex = 0
+	private finishedPlayers: string[] = []
+
 	public lastPlayer: string = ""
 	public board: string[] = []
 
-	public get players(): { username: string, passed: boolean }[] {
-		return this.playerOrder.map(username => ({
-			username,
-			passed: this.users.find(user => user.username === username)!.passed
-		}))
+	public get players(): Player[] {
+		return this.playerOrder.map(username => {
+			const user = this.users.find(user => user.username === username)!
+			return {
+				username,
+				position: user.position,
+				passed: user.passed,
+				finished: user.hand.length === 0
+			}
+		})
 	}
 
 	public get currentPlayer() {
@@ -60,6 +67,48 @@ export class ServerState {
 		do {
 			this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.playerOrder.length
 		} while (this.currentPlayer !== this.lastPlayer && (this.currentUser.passed || this.currentUser.hand.length === 0))
+	}
+
+	public newRound(): void {
+		this.board = []
+    this.lastPlayer = ""
+    this.status = "playing"
+    this.users.forEach(user => { user.passed = false })
+    if (this.currentUser.hand.length === 0) {
+      this.nextPlayer()
+    }
+    this.sendGameState("gameStateChange")
+	}
+
+	public finishedHand(user: User): void {
+		this.finishedPlayers.push(user.username)
+
+		if (this.finishedPlayers.length === 1) {
+			const currentKing = this.users.find(user => user.position === "king")
+			if (currentKing) {
+				currentKing.position = "neutral"
+			}
+
+			user.position = "king"
+		} else if (this.players.length >= 4 && this.finishedPlayers.length == 2) {
+			const currentQueen = this.users.find(user => user.position === "queen")
+			if (currentQueen) {
+				currentQueen.position = "neutral"
+			}
+
+			user.position = "queen"
+		} else if (this.players.length >= 4 && this.finishedPlayers.length === this.players.length - 1) {
+			const currentViceScum = this.users.find(user => user.position === "vice-scum")
+			if (currentViceScum) {
+				currentViceScum.position = "scum"
+			}
+
+			user.position = "vice-scum"
+		} else if (this.finishedPlayers.length === this.players.length) {
+			user.position = "scum"
+		} else {
+			user.position = "neutral"
+		}
 	}
 
 	public sendGameState(type: "gameStart" | "gameStateChange" | "roundEnd"): void {

@@ -60,7 +60,15 @@ export function handlePlayingMessage(user: User, message: ClientToServerMessage,
 				newHand.splice(cardIndex, 1)
 			}
 
-			user.hand = newHand
+      user.hand = newHand
+      if (user.hand.length === 0) {
+        serverState.finishedHand(user)
+
+        const usersRemaining = serverState.users.filter(user => user.hand.length > 0)
+        if (usersRemaining.length === 1) {
+          serverState.finishedHand(usersRemaining[0])
+        }
+      }
 
 			serverState.board = message.cards
 			serverState.lastPlayer = user.username
@@ -68,7 +76,7 @@ export function handlePlayingMessage(user: User, message: ClientToServerMessage,
 			if (cardRank === "13") {
 				serverState.status = "resolvingRound"
 				serverState.sendGameState("roundEnd")
-				setTimeout(beginRound, 1000)
+				setTimeout(serverState.newRound.bind(serverState), 1000)
 			} else {
 				serverState.nextPlayer()
 				serverState.sendGameState("gameStateChange")
@@ -101,7 +109,7 @@ export function handlePlayingMessage(user: User, message: ClientToServerMessage,
 
 			if (serverState.currentPlayer === serverState.lastPlayer) {
 				serverState.sendGameState("roundEnd")
-				setTimeout(beginRound, 1000)
+				setTimeout(serverState.newRound.bind(serverState), 1000)
 			} else {
 				serverState.sendGameState("gameStateChange")
 			}
@@ -109,16 +117,4 @@ export function handlePlayingMessage(user: User, message: ClientToServerMessage,
 			break
 		}
 	}
-
-
-  function beginRound() {
-    serverState.board = []
-    serverState.lastPlayer = ""
-    serverState.status = "playing"
-    serverState.users.forEach(user => { user.passed = false })
-    if (serverState.currentUser.hand.length === 0) {
-      serverState.nextPlayer()
-    }
-    serverState.sendGameState("gameStateChange")
-  }
 }
