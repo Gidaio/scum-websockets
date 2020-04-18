@@ -23,6 +23,10 @@ class ServerState {
 		return this.playerOrder[this.currentPlayerIndex]
 	}
 
+	public get currentUser(): User {
+		return this.users.find(user => user.username === this.currentPlayer)!
+	}
+
 	public get userCount() {
 		return Object.keys(this.users).length
 	}
@@ -56,8 +60,8 @@ class ServerState {
 
 	public nextPlayer(): void {
 		do {
-			serverState.currentPlayerIndex = (serverState.currentPlayerIndex + 1) % serverState.playerOrder.length
-		} while (serverState.users.find(user => user.username === serverState.currentPlayer)!.passed)
+			this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.playerOrder.length
+		} while (this.currentUser.passed || this.currentUser.hand.length === 0)
 	}
 
 	public sendGameState(type: "gameStart" | "gameStateChange" | "roundEnd"): void {
@@ -315,7 +319,7 @@ function handlePlayingMessage(user: User, message: ClientToServerMessage): void 
 			user.passed = true
 			serverState.nextPlayer()
 
-			const usersRemaining = serverState.users.filter(user => !user.passed)
+			const usersRemaining = serverState.users.filter(user => !user.passed && user.hand.length > 0)
 			if (usersRemaining.length === 1) {
 				serverState.sendGameState("roundEnd")
 				setTimeout(beginRound, 1000)
