@@ -12,6 +12,13 @@ class ServerState {
 		cards: []
 	}
 
+	public get players(): { username: string, passed: boolean }[] {
+		return this.playerOrder.map(username => ({
+			username,
+			passed: this.users.find(user => user.username === username)!.passed
+		}))
+	}
+
 	public get currentPlayer() {
 		return this.playerOrder[this.currentPlayerIndex]
 	}
@@ -45,6 +52,24 @@ class ServerState {
 			const cardsForUser = Math.ceil(deck.length / usersRemaining)
 			this.users[userIndex].hand = deck.splice(0, cardsForUser)
 		}
+	}
+
+	public nextPlayer(): void {
+		do {
+			serverState.currentPlayerIndex = (serverState.currentPlayerIndex + 1) % serverState.playerOrder.length
+		} while (serverState.users.find(user => user.username === serverState.currentPlayer)!.passed)
+	}
+
+	public sendGameState(type: "gameStart" | "gameStateChange" | "roundEnd"): void {
+		this.users.forEach(user => {
+			user.send({
+				type,
+				players: this.players,
+				currentPlayer: this.currentPlayer,
+				board: this.board,
+				hand: user.hand
+			})
+		})
 	}
 
 	public broadcast<T extends ServerToClientMessage>(message: T): void {
@@ -183,15 +208,7 @@ function handleWaitingMessage(user: User, message: ClientToServerMessage): void 
 
 			serverState.status = "playing"
 			serverState.initGame()
-			serverState.users.forEach(user => {
-				user.send({
-					type: "gameStart",
-					players: serverState.playerOrder,
-					currentPlayer: serverState.playerOrder[serverState.currentPlayerIndex],
-					board: serverState.board,
-					hand: user.hand
-				})
-			})
+			serverState.sendGameState("gameStart")
 
 			break
 		}
@@ -266,33 +283,47 @@ function handlePlayingMessage(user: User, message: ClientToServerMessage): void 
 
 			if (cardRank === "13") {
 				serverState.status = "resolvingRound"
-
-				serverState.users.forEach(user => {
-					user.send({
-						type: "roundEnd",
-						players: serverState.playerOrder,
-						currentPlayer: serverState.currentPlayer,
-						board: serverState.board,
-						hand: user.hand
-					})
-				})
-
+				serverState.sendGameState("roundEnd")
 				setTimeout(beginRound, 1000)
 			} else {
-				do {
-					serverState.currentPlayerIndex = (serverState.currentPlayerIndex + 1) % serverState.playerOrder.length
-				} while (serverState.users.find(user => user.username === serverState.currentPlayer)!.passed)
-
-				serverState.users.forEach(user => {
-					user.send({
-						type: "gameStateChange",
-						players: serverState.playerOrder,
-						currentPlayer: serverState.currentPlayer,
-						board: serverState.board,
-						hand: user.hand
-					})
-				})
+				serverState.nextPlayer()
+				serverState.sendGameState("gameStateChange")
 			}
+
+			break
+		}
+
+		case "pass": {
+			if (user.username !== serverState.currentPlayer) {
+				user.send({
+					type: "badRequest",
+					error: "It's not your turn!"
+				})
+
+				break
+			}
+
+			if (serverState.board.cards.length === 0) {
+				user.send({
+					type: "badRequest",
+					error: "You can't pass when you're leading. You're welcome."
+				})
+
+				break
+			}
+
+			user.passed = true
+			serverState.nextPlayer()
+
+			const usersRemaining = serverState.users.filter(user => !user.passed)
+			if (usersRemaining.length === 1) {
+				serverState.sendGameState("roundEnd")
+				setTimeout(beginRound, 1000)
+			} else {
+				serverState.sendGameState("gameStateChange")
+			}
+
+			break
 		}
 	}
 }
@@ -305,16 +336,8 @@ function beginRound() {
 	}
 
 	serverState.status = "playing"
-
-	serverState.users.forEach(user => {
-		user.send({
-			type: "gameStateChange",
-			players: serverState.playerOrder,
-			currentPlayer: serverState.currentPlayer,
-			board: serverState.board,
-			hand: user.hand
-		})
-	})
+	serverState.users.forEach(user => { user.passed = false })
+	serverState.sendGameState("gameStateChange")
 }
 
 

@@ -12,7 +12,7 @@ interface AppState {
 		ready: boolean
 	}
 	gameState?: {
-		players: string[]
+		players: { username: string, passed: boolean }[]
 		currentPlayer: string
 		board: {
 			lastPlayer: string
@@ -174,6 +174,30 @@ gamePlayCardsButton.addEventListener("click", () => {
 	})
 })
 
+gamePassButton.addEventListener("click", () => {
+	if (appState.page !== "game") {
+		console.warn("Wrong page to pass!")
+		return
+	}
+
+	if (!appState.gameState) {
+		console.error("No game state somehow!")
+		return
+	}
+
+	if (appState.username !== appState.gameState.currentPlayer) {
+		console.warn("It's not your turn!")
+		return
+	}
+
+	if (appState.gameState.board.cards.length === 0) {
+		console.warn("You can't pass when you're leading. You're welcome.")
+		return
+	}
+
+	send({ type: "pass" })
+})
+
 
 function handleSocketMessage(event: MessageEvent) {
 	console.info("Message received!")
@@ -312,22 +336,27 @@ function render() {
 			if (appState.gameState) {
 				const { gameState } = appState
 				gamePlayersDiv.innerHTML = gameState.players.map(player => {
-					let string = player
-					if (player === gameState.currentPlayer) {
-						string = `<strong>${player}</strong>`
+					let out = player.username
+
+					if (player.passed) {
+						out = `<s>${out}</s>`
 					}
 
-					return `<p>${string}</p>`
+					if (player.username === gameState.currentPlayer) {
+						out = `<strong>${out}</strong>`
+					}
+
+					return `<p>${out}</p>`
 				}).join("")
 
 				gameBoardDiv.innerHTML = ""
 				if (gameState.board.cards.length) {
 					gameBoardDiv.innerHTML =
-						`<p>${gameState.board.cards.join(" ")}</p>` +
+						`<p>${gameState.board.cards.sort().join(" ")}</p>` +
 						`<p>${gameState.roundEnd ? "Taken" : "Played"} by ${gameState.board.lastPlayer}</p>`
 				}
 
-				gameHandDiv.innerHTML = appState.gameState.hand.map(card =>
+				gameHandDiv.innerHTML = appState.gameState.hand.sort().map(card =>
 					`<input id="${card}" type="checkbox"><label for="${card}">${card}</label>`
 				).join(" ")
 			}
