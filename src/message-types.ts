@@ -30,10 +30,8 @@ interface BadRequest {
 interface GameState {
 	players: { username: string, passed: boolean }[]
 	currentPlayer: string
-	board: {
-		lastPlayer: string
-		cards: string[]
-	}
+	lastPlayer: string
+	board: string[]
 	hand: string[]
 }
 

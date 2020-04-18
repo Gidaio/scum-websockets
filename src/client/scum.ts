@@ -14,10 +14,8 @@ interface AppState {
 	gameState?: {
 		players: { username: string, passed: boolean }[]
 		currentPlayer: string
-		board: {
-			lastPlayer: string
-			cards: string[]
-		}
+		lastPlayer: string
+		board: string[]
 		hand: string[]
 		roundEnd: boolean
 	}
@@ -149,7 +147,7 @@ gamePlayCardsButton.addEventListener("click", () => {
 		}
 	}
 
-	if (appState.gameState.board.cards.length > 0 && appState.gameState.board.cards.length !== selectedCards.length) {
+	if (appState.gameState.board.length > 0 && appState.gameState.board.length !== selectedCards.length) {
 		console.warn("You must play the same number of cards as are in the middle!")
 		return
 	}
@@ -160,8 +158,8 @@ gamePlayCardsButton.addEventListener("click", () => {
 		return
 	}
 
-	if (appState.gameState.board.cards.length > 0) {
-		const boardRank = appState.gameState.board.cards[0].slice(0, 2)
+	if (appState.gameState.board.length > 0) {
+		const boardRank = appState.gameState.board[0].slice(0, 2)
 		if (Number(cardRank) <= Number(boardRank)) {
 			console.warn("You must exceed the rank of the cards in the middle!")
 			return
@@ -190,7 +188,7 @@ gamePassButton.addEventListener("click", () => {
 		return
 	}
 
-	if (appState.gameState.board.cards.length === 0) {
+	if (appState.gameState.board.length === 0) {
 		console.warn("You can't pass when you're leading. You're welcome.")
 		return
 	}
@@ -259,6 +257,7 @@ function handleSocketMessage(event: MessageEvent) {
 				appState.gameState = {
 					players: message.players,
 					currentPlayer: message.currentPlayer,
+					lastPlayer: message.lastPlayer,
 					board: message.board,
 					hand: message.hand,
 					roundEnd: false
@@ -275,6 +274,7 @@ function handleSocketMessage(event: MessageEvent) {
 				appState.gameState = {
 					players: message.players,
 					currentPlayer: message.currentPlayer,
+					lastPlayer: message.lastPlayer,
 					board: message.board,
 					hand: message.hand,
 					roundEnd: false
@@ -287,6 +287,7 @@ function handleSocketMessage(event: MessageEvent) {
 				appState.gameState = {
 					players: message.players,
 					currentPlayer: message.currentPlayer,
+					lastPlayer: message.lastPlayer,
 					board: message.board,
 					hand: message.hand,
 					roundEnd: true
@@ -350,10 +351,10 @@ function render() {
 				}).join("")
 
 				gameBoardDiv.innerHTML = ""
-				if (gameState.board.cards.length) {
+				if (gameState.board.length) {
 					gameBoardDiv.innerHTML =
-						`<p>${gameState.board.cards.sort().join(" ")}</p>` +
-						`<p>${gameState.roundEnd ? "Taken" : "Played"} by ${gameState.board.lastPlayer}</p>`
+						`<p>${gameState.board.sort().join(" ")}</p>` +
+						`<p>${gameState.roundEnd ? "Taken" : "Played"} by ${gameState.lastPlayer}</p>`
 				}
 
 				gameHandDiv.innerHTML = appState.gameState.hand.sort().map(card =>
