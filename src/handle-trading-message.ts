@@ -40,6 +40,7 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
 
       if (user.position === "king") {
         const scum = serverState.users.find(user => user.position === "scum")!
+        scum.hand.push(...message.cards)
         scum.send({
           type: "cardsReceived",
           player: user.username,
@@ -54,6 +55,7 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
 
       if (user.position === "queen") {
         const viceScum = serverState.users.find(user => user.position === "vice-scum")!
+        viceScum.hand.push(...message.cards)
         viceScum.send({
           type: "cardsReceived",
           player: user.username,

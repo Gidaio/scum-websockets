@@ -10,7 +10,6 @@ export class ServerState {
 	public waitingOnTrades: string[] = []
 	private finishedPlayers: string[] = []
 
-
 	public lastPlayer: string = ""
 	public board: string[] = []
 
@@ -52,10 +51,17 @@ export class ServerState {
 	public newHand(): void {
 		this.dealCards()
 
+		this.board = []
+		this.lastPlayer = ""
+		this.finishedPlayers = []
+
 		this.status = "trading"
 
 		const king = this.users.find(user => user.position === "king")!
 		const scum = this.users.find(user => user.position === "scum")!
+		const scumIndex = this.players.findIndex(player => player.username === scum.username)
+
+		this.currentPlayerIndex = scumIndex
 
 		const scumCards = scum.hand.sort((a, b) => a < b ? 1 : -1).splice(0, 2)
 		king.hand.push(...scumCards)

@@ -269,8 +269,8 @@ gameSendButton.addEventListener("click", () => {
 
 
 function handleSocketMessage(event: MessageEvent) {
-	console.info("Message received!")
 	const message: ServerToClientMessage = JSON.parse(event.data)
+	console.info(`${message.type} message received!`)
 
 	if (message.type === "badRequest") {
 		console.error(message.error)
@@ -364,7 +364,7 @@ function handleSocketMessage(event: MessageEvent) {
 					board: message.board,
 					hand: message.hand,
 					roundEnd: true,
-					trading: false
+					trading: appState.gameState!.trading
 				}
 
 				break
@@ -372,13 +372,12 @@ function handleSocketMessage(event: MessageEvent) {
 
 			case "handEnd": {
 				appState.gameState!.trading = true
-				appState.gameState!.message = "The hand is over!"
 				break
 			}
 
 			case "handBegin": {
 				appState.gameState!.trading = false
-				appState.gameState!.message = undefined
+				appState.tradingState = undefined
 				break
 			}
 
