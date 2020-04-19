@@ -19,6 +19,27 @@ export class User {
 		this.socket = socket
 	}
 
+	public removeCards(cards: string[]): boolean {
+		const newHand = [...this.hand]
+		for (const card of cards) {
+			const cardIndex = newHand.findIndex(newHandCard => newHandCard === card)
+			if (cardIndex === -1) {
+				this.send({
+					type: "badRequest",
+					error: `You don't have the card ${card}!`
+				})
+
+				return false
+			}
+
+			newHand.splice(cardIndex, 1)
+		}
+
+		this.hand = newHand
+
+		return true
+	}
+
 	public send<T extends ServerToClientMessage>(message: T): void {
 		if (!this.socket) {
 			console.error(`User ${this._username} doesn't have a socket!`)

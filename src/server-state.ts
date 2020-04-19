@@ -3,11 +3,13 @@ import { User } from "./user"
 
 export class ServerState {
 	public users: User[] = []
-	public status: "waiting" | "playing" | "resolvingRound" = "waiting"
+	public status: "waiting" | "playing" | "resolvingRound" | "trading" = "waiting"
 
 	public playerOrder: string[] = []
 	public currentPlayerIndex = 0
+	public waitingOnTrades: string[] = []
 	private finishedPlayers: string[] = []
+
 
 	public lastPlayer: string = ""
 	public board: string[] = []
@@ -44,7 +46,90 @@ export class ServerState {
 		if (this.playerOrder.length === 0) {
 			this.playerOrder = shuffle(this.users.map(user => user.username))
 		}
+		this.dealCards()
+	}
 
+	public newHand(): void {
+		this.dealCards()
+
+		this.status = "trading"
+
+		const king = this.users.find(user => user.position === "king")!
+		const scum = this.users.find(user => user.position === "scum")!
+
+		const scumCards = scum.hand.sort((a, b) => a < b ? 1 : -1).splice(0, 2)
+		king.hand.push(...scumCards)
+
+		scum.send({
+			type: "gameStateChange",
+			players: this.players,
+			currentPlayer: this.currentPlayer,
+			lastPlayer: this.lastPlayer,
+			board: this.board,
+			hand: scum.hand
+		})
+		scum.send({
+			type: "cardsSent",
+			player: king.username,
+			cards: scumCards
+		})
+
+		king.send({
+			type: "gameStateChange",
+			players: this.players,
+			currentPlayer: this.currentPlayer,
+			lastPlayer: this.lastPlayer,
+			board: this.board,
+			hand: king.hand
+		})
+		king.send({
+			type: "cardsReceived",
+			player: scum.username,
+			cards: scumCards
+		})
+
+		this.waitingOnTrades.push(king.username)
+
+		if (this.players.length >= 4) {
+			const queen = this.users.find(user => user.position === "queen")!
+			const viceScum = this.users.find(user => user.position === "vice-scum")!
+
+			const scumCards = viceScum.hand.sort((a, b) => a < b ? 1 : -1).splice(0, 1)
+			queen.hand.push(...scumCards)
+
+			viceScum.send({
+				type: "gameStateChange",
+				players: this.players,
+				currentPlayer: this.currentPlayer,
+				lastPlayer: this.lastPlayer,
+				board: this.board,
+				hand: viceScum.hand
+			})
+			viceScum.send({
+				type: "cardsSent",
+				player: queen.username,
+				cards: scumCards
+			})
+
+			queen.send({
+				type: "gameStateChange",
+				players: this.players,
+				currentPlayer: this.currentPlayer,
+				lastPlayer: this.lastPlayer,
+				board: this.board,
+				hand: queen.hand
+			})
+			queen.send({
+				type: "cardsReceived",
+				player: viceScum.username,
+				cards: scumCards
+			})
+
+			this.waitingOnTrades.push(queen.username)
+		}
+	}
+
+	private dealCards(): void {
 		// TODO: Needs to rotate who the deal "starts" with, i.e. who gets more cards.
 		let deck = []
 		for (let times = 0; times < (Math.ceil(this.users.length / 5)); times++) {

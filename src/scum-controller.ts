@@ -5,6 +5,7 @@ import { User } from "./user"
 
 import WebSocket from "ws"
 import { handlePlayingMessage } from "./handle-playing-message"
+import { handleTradingMessage } from "./handle-trading-message"
 
 
 const serverState = new ServerState()
@@ -29,6 +30,11 @@ export function scumController(wsServer: WebSocket.Server) {
 
 					case "playing": {
 						handlePlayingMessage(user, message, serverState)
+						break
+					}
+
+					case "trading": {
+						handleTradingMessage(user, message, serverState)
 						break
 					}
 				}

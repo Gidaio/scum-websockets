@@ -1,6 +1,9 @@
 // Server to client message
 
-type ServerToClientMessage = LoginAccepted | ReadyStateChange | GameStart | GameStateChange | RoundEnd | BadRequest
+type ServerToClientMessage =
+	LoginAccepted | ReadyStateChange | GameStart |
+	GameStateChange | RoundEnd | HandEnd | CardsSent | CardsReceived | HandBegin |
+	BadRequest
 
 
 interface LoginAccepted {
@@ -15,11 +18,31 @@ interface ReadyStateChange {
 	}
 }
 
-type GameStart = { type: "gameStart" } & GameState
+interface GameStart extends GameState { type: "gameStart" }
 
-type GameStateChange = { type: "gameStateChange" } & GameState
+interface GameStateChange extends GameState { type: "gameStateChange" }
 
-type RoundEnd = { type: "roundEnd" } & GameState
+interface RoundEnd extends GameState { type: "roundEnd" }
+
+interface HandEnd {
+	type: "handEnd"
+}
+
+interface HandBegin {
+	type: "handBegin"
+}
+
+interface CardsSent {
+	type: "cardsSent"
+	player: string
+	cards: string[]
+}
+
+interface CardsReceived {
+	type: "cardsReceived"
+	player: string
+	cards: string[]
+}
 
 interface BadRequest {
 	type: "badRequest"
@@ -29,7 +52,7 @@ interface BadRequest {
 
 // Client to server messages
 
-type ClientToServerMessage = LoginRequest | SetReadyState | RequestGameStart | PlayCards | Pass
+type ClientToServerMessage = LoginRequest | SetReadyState | RequestGameStart | PlayCards | Pass | SendCards
 
 
 interface LoginRequest {
@@ -53,6 +76,11 @@ interface PlayCards {
 
 interface Pass {
 	type: "pass"
+}
+
+interface SendCards {
+	type: "sendCards"
+	cards: string[]
 }
 
 

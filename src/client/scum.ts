@@ -13,6 +13,13 @@ interface AppState {
 	}
 	gameState?: GameState & {
 		roundEnd: boolean
+		trading: boolean
+		message?: string
+	}
+	tradingState?: {
+		player: string
+		cardsSent?: string[]
+		cardsReceived?: string[]
 	}
 }
 
@@ -35,6 +42,8 @@ const gameBoardDiv = document.getElementById("game-board") as HTMLDivElement
 const gameHandDiv = document.getElementById("game-hand") as HTMLDivElement
 const gamePlayCardsButton = document.getElementById("game-play-cards") as HTMLButtonElement
 const gamePassButton = document.getElementById("game-pass") as HTMLButtonElement
+const gameSendButton = document.getElementById("game-send") as HTMLButtonElement
+const gameMessageDiv = document.getElementById("game-message") as HTMLDivElement
 
 
 const appState: AppState = {
@@ -126,6 +135,11 @@ gamePlayCardsButton.addEventListener("click", () => {
 		return
 	}
 
+	if (appState.gameState.trading) {
+		console.warn("You can't play cards while you're trading!")
+		return
+	}
+
 	if (appState.username !== appState.gameState.currentPlayer) {
 		console.warn("It's not your turn!")
 		return
@@ -133,11 +147,11 @@ gamePlayCardsButton.addEventListener("click", () => {
 
 	const selectedCards: string[] = []
 	for (const element of Array.from(gameHandDiv.children)) {
-		if (element.tagName !== "INPUT") {
+		if (element.tagName !== "SPAN") {
 			continue
 		}
 
-		if ((element as HTMLInputElement).checked) {
+		if ((element as HTMLSpanElement).classList.contains("selected")) {
 			selectedCards.push(element.id)
 		}
 	}
@@ -178,6 +192,11 @@ gamePassButton.addEventListener("click", () => {
 		return
 	}
 
+	if (appState.gameState.trading) {
+		console.warn("You can't pass when you're trading!")
+		return
+	}
+
 	if (appState.username !== appState.gameState.currentPlayer) {
 		console.warn("It's not your turn!")
 		return
@@ -189,6 +208,63 @@ gamePassButton.addEventListener("click", () => {
 	}
 
 	send({ type: "pass" })
+})
+
+gameSendButton.addEventListener("click", () => {
+	if (appState.page !== "game") {
+		console.warn("Wrong page to send cards!")
+		return
+	}
+
+	if (!appState.gameState) {
+		console.error("No game state somehow...")
+		return
+	}
+
+	if (!appState.gameState.trading) {
+		console.warn("Can't send cards when you're not trading!")
+		return
+	}
+
+	const self = getSelf()!
+
+	if (self.position !== "king" && self.position !== "queen") {
+		console.warn("You're not in a position to send cards!")
+		return
+	}
+
+	const selectedCards: string[] = []
+	for (const element of Array.from(gameHandDiv.children)) {
+		if (element.tagName !== "SPAN") {
+			continue
+		}
+
+		if ((element as HTMLSpanElement).classList.contains("selected")) {
+			selectedCards.push(element.id)
+		}
+	}
+
+	if (self.position === "king") {
+		if (selectedCards.length !== 2) {
+			console.warn("As king, you must select exactly 2 cards.")
+			return
+		} else {
+			send({
+				type: "sendCards",
+				cards: selectedCards
+			})
+		}
+	} else if (self.position === "queen") {
+		if (selectedCards.length !== 1) {
+			console.warn("As queen, you must select exactly 2 cards.")
+			return
+		} else {
+			send({
+				type: "sendCards",
+				cards: selectedCards
+			})
+		}
+	}
 })
 
 
@@ -255,7 +331,8 @@ function handleSocketMessage(event: MessageEvent) {
 					lastPlayer: message.lastPlayer,
 					board: message.board,
 					hand: message.hand,
-					roundEnd: false
+					roundEnd: false,
+					trading: false
 				}
 
 				break
@@ -272,7 +349,8 @@ function handleSocketMessage(event: MessageEvent) {
 					lastPlayer: message.lastPlayer,
 					board: message.board,
 					hand: message.hand,
-					roundEnd: false
+					roundEnd: false,
+					trading: appState.gameState!.trading
 				}
 
 				break
@@ -285,8 +363,41 @@ function handleSocketMessage(event: MessageEvent) {
 					lastPlayer: message.lastPlayer,
 					board: message.board,
 					hand: message.hand,
-					roundEnd: true
+					roundEnd: true,
+					trading: false
 				}
+
+				break
+			}
+
+			case "handEnd": {
+				appState.gameState!.trading = true
+				appState.gameState!.message = "The hand is over!"
+				break
+			}
+
+			case "handBegin": {
+				appState.gameState!.trading = false
+				appState.gameState!.message = undefined
+				break
+			}
+
+			case "cardsSent": {
+				appState.tradingState = {
+					player: message.player,
+					cardsSent: message.cards
+				}
+
+				break
+			}
+
+			case "cardsReceived": {
+				appState.tradingState = {
+					player: message.player,
+					cardsReceived: message.cards
+				}
+
+				break
 			}
 		}
 	}
@@ -337,22 +448,22 @@ function render() {
 					if (player.position !== "neutral") {
 						switch (player.position) {
 							case "king": {
-								out += " &#x265A;"
+								out += " &#x1F451;"
 								break
 							}
 
 							case "queen": {
-								out += " &#x265B;"
+								out += " &#x1F984;"
 								break
 							}
 
 							case "vice-scum": {
-								out += " &#x265D;"
+								out += " &#x1F612;"
 								break
 							}
 
 							case "scum": {
-								out += " &#x265F;"
+								out += " &#x1F4A9;"
 								break
 							}
 						}
@@ -370,15 +481,46 @@ function render() {
 				}).join("")
 
 				gameBoardDiv.innerHTML = ""
-				if (gameState.board.length) {
-					gameBoardDiv.innerHTML =
-						`<p>${gameState.board.sort().join(" ")}</p>` +
-						`<p>${gameState.roundEnd ? "Taken" : "Played"} by ${gameState.lastPlayer}</p>`
+				if (gameState.board.length && !gameState.trading) {
+					const pElement = document.createElement("p")
+					const message = document.createElement("p")
+					message.innerHTML = `${gameState.roundEnd ? "Taken" : "Played"} by ${gameState.lastPlayer}`
+					pElement.append(...renderCards(gameState.board, false))
+					gameBoardDiv.append(pElement, message)
 				}
 
-				gameHandDiv.innerHTML = appState.gameState.hand.sort().map(card =>
-					`<input id="${card}" type="checkbox"><label for="${card}">${card}</label>`
-				).join(" ")
+				gameHandDiv.innerHTML = ""
+				gameHandDiv.append(...renderCards(gameState.hand, true))
+
+				if (gameState.trading) {
+					gamePlayCardsButton.hidden = true
+					gamePassButton.hidden = true
+					if (getSelf()?.position === "king" || getSelf()?.position === "queen") {
+						gameSendButton.hidden = false
+					}
+				} else {
+					gamePlayCardsButton.hidden = false
+					gamePassButton.hidden = false
+					gameSendButton.hidden = true
+				}
+
+				gameMessageDiv.innerHTML = ""
+				if (appState.tradingState) {
+					if (appState.tradingState.cardsSent) {
+						const pElement = document.createElement("p")
+						pElement.append("Sent ", ...renderCards(appState.tradingState.cardsSent, false), ` to ${appState.tradingState.player}.`)
+						gameMessageDiv.appendChild(pElement)
+					}
+
+					if (appState.tradingState.cardsReceived) {
+						const pElement = document.createElement("p")
+						pElement.append("Received ", ...renderCards(appState.tradingState.cardsReceived, false), ` from ${appState.tradingState.player}`)
+						gameMessageDiv.appendChild(pElement)
+					}
+				}
+				if (gameState.message) {
+					gameMessageDiv.innerHTML += `<p>${gameState.message}</p>`
+				}
 			}
 
 			break
@@ -388,6 +530,78 @@ function render() {
 			console.error("Something has gone very wrong.")
 		}
 	}
+}
+
+
+function renderCards(rawCards: string[], interactable: boolean): HTMLSpanElement[] {
+	const cards = rawCards.sort().map(rawCard => {
+		let color = ""
+		let rank = Number(rawCard.slice(0, 2)) % 13
+		if (rank >= 11) {
+			rank++
+		}
+		const suit = rawCard[2]
+		if (suit === "D" || suit === "H") {
+			color = "red"
+		} else {
+			color = "black"
+		}
+
+		let unicode = 0x1F0A1 + rank
+		switch (suit) {
+			case "H": {
+				unicode += 0x10
+				break
+			}
+
+			case "D": {
+				unicode += 0x20
+				break
+			}
+
+			case "C": {
+				unicode += 0x30
+				break
+			}
+		}
+
+		return {
+			color,
+			unicode: `&#x${unicode.toString(16)};`,
+			card: rawCard
+		}
+	})
+
+	const cardElements = cards.map(card => {
+		const element = document.createElement("span")
+		element.id = card.card
+		element.classList.add("card", card.color)
+		element.innerHTML = card.unicode
+
+		return element
+	})
+
+	if (interactable) {
+		cardElements.forEach(card => {
+			card.addEventListener("click", toggleCardSelected)
+		})
+	}
+
+	return cardElements
+}
+
+
+function toggleCardSelected(event: MouseEvent) {
+	(event.target as HTMLElement).classList.toggle("selected")
+}
+
+
+function getSelf(): Player | null {
+	if (appState.gameState) {
+		return appState.gameState.players.find(player => player.username === appState.username)!
+	}
+
+	return null
 }
 
 

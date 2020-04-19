@@ -45,30 +45,24 @@ export function handlePlayingMessage(user: User, message: ClientToServerMessage,
 				}
 			}
 
-			const newHand = [...user.hand]
-			for (const card of message.cards) {
-				const cardIndex = newHand.findIndex(newHandCard => newHandCard === card)
-				if (cardIndex === -1) {
-					user.send({
-						type: "badRequest",
-						error: `You don't have the card ${card}!`
-					})
-
-					return
-				}
-
-				newHand.splice(cardIndex, 1)
+			if (!user.removeCards(message.cards)) {
+				return
 			}
 
-      user.hand = newHand
-      if (user.hand.length === 0) {
-        serverState.finishedHand(user)
+			if (user.hand.length === 0) {
+				serverState.finishedHand(user)
 
-        const usersRemaining = serverState.users.filter(user => user.hand.length > 0)
-        if (usersRemaining.length === 1) {
-          serverState.finishedHand(usersRemaining[0])
-        }
-      }
+				const usersRemaining = serverState.users.filter(user => user.hand.length > 0)
+				if (usersRemaining.length === 1) {
+					serverState.finishedHand(usersRemaining[0])
+
+					serverState.broadcast({
+						type: "handEnd"
+					})
+
+					setTimeout(serverState.newHand.bind(serverState), 2000)
+				}
+			}
 
 			serverState.board = message.cards
 			serverState.lastPlayer = user.username
@@ -76,7 +70,7 @@ export function handlePlayingMessage(user: User, message: ClientToServerMessage,
 			if (cardRank === "13") {
 				serverState.status = "resolvingRound"
 				serverState.sendGameState("roundEnd")
-				setTimeout(serverState.newRound.bind(serverState), 1000)
+				setTimeout(serverState.newRound.bind(serverState), 2000)
 			} else {
 				serverState.nextPlayer()
 				serverState.sendGameState("gameStateChange")
@@ -109,7 +103,7 @@ export function handlePlayingMessage(user: User, message: ClientToServerMessage,
 
 			if (serverState.currentPlayer === serverState.lastPlayer) {
 				serverState.sendGameState("roundEnd")
-				setTimeout(serverState.newRound.bind(serverState), 1000)
+				setTimeout(serverState.newRound.bind(serverState), 2000)
 			} else {
 				serverState.sendGameState("gameStateChange")
 			}

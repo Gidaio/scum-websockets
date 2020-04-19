@@ -2,6 +2,26 @@
 <html>
 <head>
 	<title>Scum</title>
+
+	<style>
+		.card {
+			font-size: 2rem;
+			-moz-user-select: none;
+			-webkit-user-select: none;
+		}
+
+		.red {
+			color: red;
+		}
+
+		.black {
+			color: black;
+		}
+
+		.selected {
+			color: blue;
+		}
+	</style>
 </head>
 
 <body>
@@ -25,6 +45,8 @@
 		<div id="game-hand"></div>
 		<button id="game-play-cards" type="button">Play</button>
 		<button id="game-pass" type="button">Pass</button>
+		<button id="game-send" type="button" hidden>Send Cards</button>
+		<div id="game-message"></div>
 	</div>
 
 	<script src="scum.js"></script>
