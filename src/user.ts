@@ -1,30 +1,22 @@
 import WebSocket from "ws"
 
 
-export class User {
-	private _username: string
-	private socket: WebSocket
+export interface User {
+	readonly username: string
+	readonly socket: WebSocket
 
-	public ready: boolean = false
-	public hand: string[] = []
-	public passed: boolean = false
-	public position: ScumPosition = "neutral"
+	ready: boolean
+	hand: string[]
+	passed: boolean
+	position: ScumPosition
+}
 
-	public get username() {
-		return this._username
-	}
-
-	constructor (username: string, socket: WebSocket) {
-		this._username = username
-		this.socket = socket
-	}
-
-	public removeCards(cards: string[]): boolean {
-		const newHand = [...this.hand]
+export function removeCards(user: User, cards: string[]): boolean {
+	const newHand = [...user.hand]
 		for (const card of cards) {
 			const cardIndex = newHand.findIndex(newHandCard => newHandCard === card)
 			if (cardIndex === -1) {
-				this.send({
+				send(user, {
 					type: "badRequest",
 					error: `You don't have the card ${card}!`
 				})
@@ -35,21 +27,20 @@ export class User {
 			newHand.splice(cardIndex, 1)
 		}
 
-		this.hand = newHand
+		user.hand = newHand
 
 		return true
+}
+
+export function send<T extends ServerToClientMessage>(user: User, message: T): void {
+	if (!user.socket) {
+		console.error(`User ${user.username} doesn't have a socket!`)
+		return
 	}
 
-	public send<T extends ServerToClientMessage>(message: T): void {
-		if (!this.socket) {
-			console.error(`User ${this._username} doesn't have a socket!`)
-			return
-		}
-
-		if (this.socket.readyState !== WebSocket.OPEN) {
-			console.error(`User ${this._username}'s socket isn't open!`)
-		}
-
-		this.socket.send(JSON.stringify(message))
+	if (user.socket.readyState !== WebSocket.OPEN) {
+		console.error(`User ${user.username}'s socket isn't open!`)
 	}
+
+	user.socket.send(JSON.stringify(message))
 }

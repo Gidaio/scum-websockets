@@ -1,12 +1,12 @@
-import { ServerState } from "./server-state"
-import { User } from "./user"
+import { ServerState, broadcast, sendGameState } from "./server-state"
+import { User, removeCards, send } from "./user"
 
 
 export function handleTradingMessage(user: User, message: ClientToServerMessage, serverState: ServerState): void {
   switch (message.type) {
     case "sendCards": {
       if (!serverState.waitingOnTrades.includes(user.username)) {
-        user.send({
+        send(user, {
           type: "badRequest",
           error: "Not waiting on a trade from you!"
         })
@@ -15,7 +15,7 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
       }
 
       if (user.position === "king" && message.cards.length !== 2) {
-        user.send({
+        send(user, {
           type: "badRequest",
           error: "As king, you must send exactly two cards."
         })
@@ -24,7 +24,7 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
       }
 
       if (user.position === "queen" && message.cards.length !== 1) {
-        user.send({
+        send(user, {
           type: "badRequest",
           error: "As queen, you must send exactly one card."
         })
@@ -32,7 +32,7 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
         break
       }
 
-      if (!user.removeCards(message.cards)) {
+      if (!removeCards(user, message.cards)) {
         break
       }
 
@@ -41,12 +41,12 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
       if (user.position === "king") {
         const scum = serverState.users.find(user => user.position === "scum")!
         scum.hand.push(...message.cards)
-        scum.send({
+        send(scum, {
           type: "cardsReceived",
           player: user.username,
           cards: message.cards
         })
-        user.send({
+        send(user, {
           type: "cardsSent",
           player: scum.username,
           cards: message.cards
@@ -56,19 +56,19 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
       if (user.position === "queen") {
         const viceScum = serverState.users.find(user => user.position === "vice-scum")!
         viceScum.hand.push(...message.cards)
-        viceScum.send({
+        send(viceScum, {
           type: "cardsReceived",
           player: user.username,
           cards: message.cards
         })
-        user.send({
+        send(user, {
           type: "cardsSent",
           player: viceScum.username,
           cards: message.cards
         })
       }
 
-      serverState.sendGameState("gameStateChange")
+      sendGameState(serverState, "gameStateChange")
 
       if (serverState.waitingOnTrades.length === 0) {
         setTimeout(beginHand, 2000)
@@ -81,7 +81,7 @@ export function handleTradingMessage(user: User, message: ClientToServerMessage,
 
   function beginHand() {
     serverState.status = "playing"
-    serverState.broadcast({ type: "handBegin" })
+    broadcast(serverState, { type: "handBegin" })
   }
 }
 

@@ -1,225 +1,227 @@
-import { User } from "./user"
+import { User, send } from "./user"
 
 
-export class ServerState {
-	public users: User[] = []
-	public status: "waiting" | "playing" | "resolvingRound" | "trading" = "waiting"
+export interface ServerState {
+	users: User[]
+	status: ServerStatus
 
-	public playerOrder: string[] = []
-	public currentPlayerIndex = 0
-	public waitingOnTrades: string[] = []
-	private finishedPlayers: string[] = []
+	playerOrder: string[]
+	currentPlayerIndex: number
+	waitingOnTrades: string[]
+	finishedPlayers: string[]
 
-	public lastPlayer: string = ""
-	public board: string[] = []
+	lastPlayer: string
+	board: string[]
+}
 
-	public get players(): Player[] {
-		return this.playerOrder.map(username => {
-			const user = this.users.find(user => user.username === username)!
-			return {
-				username,
-				position: user.position,
-				passed: user.passed,
-				finished: user.hand.length === 0
-			}
-		})
-	}
+type ServerStatus = "waiting" | "playing" | "resolvingRound" | "trading"
 
-	public get currentPlayer() {
-		return this.playerOrder[this.currentPlayerIndex]
-	}
-
-	public get currentUser(): User {
-		return this.users.find(user => user.username === this.currentPlayer)!
-	}
-
-	public get userCount() {
-		return Object.keys(this.users).length
-	}
-
-	public addUser(user: User): void {
-		this.users.push(user)
-	}
-
-	public initGame(): void {
-		if (this.playerOrder.length === 0) {
-			this.playerOrder = shuffle(this.users.map(user => user.username))
+export function players(serverState: ServerState): Player[] {
+	return serverState.playerOrder.map(username => {
+		const user = serverState.users.find(user => user.username === username)!
+		return {
+			username,
+			position: user.position,
+			passed: user.passed,
+			finished: user.hand.length === 0
 		}
-		this.dealCards()
+	})
+}
+
+export function currentPlayer(serverState: ServerState): string {
+	return serverState.playerOrder[serverState.currentPlayerIndex]
+}
+
+export function currentUser(serverState: ServerState): User {
+	return serverState.users.find(user => user.username === currentPlayer(serverState))!
+}
+
+export function userCount(serverState: ServerState): number {
+	return Object.keys(serverState.users).length
+}
+
+export function addUser(serverState: ServerState, user: User): void {
+	serverState.users.push(user)
+}
+
+export function initGame(serverState: ServerState): void {
+	if (serverState.playerOrder.length === 0) {
+		serverState.playerOrder = shuffle(serverState.users.map(user => user.username))
 	}
+	dealCards(serverState)
+}
 
-	public newHand(): void {
-		this.dealCards()
+export function newHand(serverState: ServerState): void {
+	dealCards(serverState)
 
-		this.board = []
-		this.lastPlayer = ""
-		this.finishedPlayers = []
+	serverState.board = []
+	serverState.lastPlayer = ""
+	serverState.finishedPlayers = []
 
-		this.status = "trading"
+	serverState.status = "trading"
 
-		const king = this.users.find(user => user.position === "king")!
-		const scum = this.users.find(user => user.position === "scum")!
-		const scumIndex = this.players.findIndex(player => player.username === scum.username)
+	const king = serverState.users.find(user => user.position === "king")!
+	const scum = serverState.users.find(user => user.position === "scum")!
+	const scumIndex = players(serverState).findIndex(player => player.username === scum.username)
 
-		this.currentPlayerIndex = scumIndex
+	serverState.currentPlayerIndex = scumIndex
 
-		const scumCards = scum.hand.sort((a, b) => a < b ? 1 : -1).splice(0, 2)
-		king.hand.push(...scumCards)
+	const scumCards = scum.hand.sort((a, b) => a < b ? 1 : -1).splice(0, 2)
+	king.hand.push(...scumCards)
 
-		scum.send({
+	send(scum, {
+		type: "gameStateChange",
+		players: players(serverState),
+		currentPlayer: currentPlayer(serverState),
+		lastPlayer: serverState.lastPlayer,
+		board: serverState.board,
+		hand: scum.hand
+	})
+	send(scum, {
+		type: "cardsSent",
+		player: king.username,
+		cards: scumCards
+	})
+
+	send(king, {
+		type: "gameStateChange",
+		players: players(serverState),
+		currentPlayer: currentPlayer(serverState),
+		lastPlayer: serverState.lastPlayer,
+		board: serverState.board,
+		hand: king.hand
+	})
+	send(king, {
+		type: "cardsReceived",
+		player: scum.username,
+		cards: scumCards
+	})
+
+	serverState.waitingOnTrades.push(king.username)
+
+	if (players(serverState).length >= 4) {
+		const queen = serverState.users.find(user => user.position === "queen")!
+		const viceScum = serverState.users.find(user => user.position === "vice-scum")!
+
+		const scumCards = viceScum.hand.sort((a, b) => a < b ? 1 : -1).splice(0, 1)
+		queen.hand.push(...scumCards)
+
+		send(viceScum, {
 			type: "gameStateChange",
-			players: this.players,
-			currentPlayer: this.currentPlayer,
-			lastPlayer: this.lastPlayer,
-			board: this.board,
-			hand: scum.hand
+			players: players(serverState),
+			currentPlayer: currentPlayer(serverState),
+			lastPlayer: serverState.lastPlayer,
+			board: serverState.board,
+			hand: viceScum.hand
 		})
-		scum.send({
+		send(viceScum, {
 			type: "cardsSent",
-			player: king.username,
+			player: queen.username,
 			cards: scumCards
 		})
 
-		king.send({
+		send(queen, {
 			type: "gameStateChange",
-			players: this.players,
-			currentPlayer: this.currentPlayer,
-			lastPlayer: this.lastPlayer,
-			board: this.board,
-			hand: king.hand
+			players: players(serverState),
+			currentPlayer: currentPlayer(serverState),
+			lastPlayer: serverState.lastPlayer,
+			board: serverState.board,
+			hand: queen.hand
 		})
-		king.send({
+		send(queen, {
 			type: "cardsReceived",
-			player: scum.username,
+			player: viceScum.username,
 			cards: scumCards
 		})
 
-		this.waitingOnTrades.push(king.username)
-
-		if (this.players.length >= 4) {
-			const queen = this.users.find(user => user.position === "queen")!
-			const viceScum = this.users.find(user => user.position === "vice-scum")!
-
-			const scumCards = viceScum.hand.sort((a, b) => a < b ? 1 : -1).splice(0, 1)
-			queen.hand.push(...scumCards)
-
-			viceScum.send({
-				type: "gameStateChange",
-				players: this.players,
-				currentPlayer: this.currentPlayer,
-				lastPlayer: this.lastPlayer,
-				board: this.board,
-				hand: viceScum.hand
-			})
-			viceScum.send({
-				type: "cardsSent",
-				player: queen.username,
-				cards: scumCards
-			})
-
-			queen.send({
-				type: "gameStateChange",
-				players: this.players,
-				currentPlayer: this.currentPlayer,
-				lastPlayer: this.lastPlayer,
-				board: this.board,
-				hand: queen.hand
-			})
-			queen.send({
-				type: "cardsReceived",
-				player: viceScum.username,
-				cards: scumCards
-			})
-
-			this.waitingOnTrades.push(queen.username)
-		}
+		serverState.waitingOnTrades.push(queen.username)
 	}
+}
 
-	private dealCards(): void {
-		// TODO: Needs to rotate who the deal "starts" with, i.e. who gets more cards.
-		let deck = []
-		for (let times = 0; times < (Math.ceil(this.users.length / 5)); times++) {
-			for (const suit of ["C", "D", "H", "S"]) {
-				for (let rank = 1; rank <= 13; rank++) {
-					deck.push(`${rank.toString().padStart(2, "0")}${suit}`)
-				}
+function dealCards(serverState: ServerState): void {
+	// TODO: Needs to rotate who the deal "starts" with, i.e. who gets more cards.
+	let deck = []
+	for (let times = 0; times < (Math.ceil(serverState.users.length / 5)); times++) {
+		for (const suit of ["C", "D", "H", "S"]) {
+			for (let rank = 1; rank <= 13; rank++) {
+				deck.push(`${rank.toString().padStart(2, "0")}${suit}`)
 			}
 		}
-		deck = shuffle(deck)
+	}
+	deck = shuffle(deck)
 
-		for (let userIndex = 0; userIndex < this.users.length; userIndex++) {
-			const usersRemaining = this.users.length - userIndex
-			const cardsForUser = Math.ceil(deck.length / usersRemaining)
-			this.users[userIndex].hand = deck.splice(0, cardsForUser)
+	for (let userIndex = 0; userIndex < serverState.users.length; userIndex++) {
+		const usersRemaining = serverState.users.length - userIndex
+		const cardsForUser = Math.ceil(deck.length / usersRemaining)
+		serverState.users[userIndex].hand = deck.splice(0, cardsForUser)
+	}
+}
+
+export function nextPlayer(serverState: ServerState): void {
+	do {
+		serverState.currentPlayerIndex = (serverState.currentPlayerIndex + 1) % serverState.playerOrder.length
+	} while (currentPlayer(serverState) !== serverState.lastPlayer && (currentUser(serverState).passed || currentUser(serverState).hand.length === 0))
+}
+
+export function newRound(serverState: ServerState): void {
+	serverState.board = []
+	serverState.lastPlayer = ""
+	serverState.status = "playing"
+	serverState.users.forEach(user => { user.passed = false })
+	if (currentUser(serverState).hand.length === 0) {
+		nextPlayer(serverState)
+	}
+	sendGameState(serverState, "gameStateChange")
+}
+
+export function finishedHand(serverState: ServerState, user: User): void {
+	serverState.finishedPlayers.push(user.username)
+
+	if (serverState.finishedPlayers.length === 1) {
+		const currentKing = serverState.users.find(user => user.position === "king")
+		if (currentKing) {
+			currentKing.position = "neutral"
 		}
-	}
 
-	public nextPlayer(): void {
-		do {
-			this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.playerOrder.length
-		} while (this.currentPlayer !== this.lastPlayer && (this.currentUser.passed || this.currentUser.hand.length === 0))
-	}
-
-	public newRound(): void {
-		this.board = []
-    this.lastPlayer = ""
-    this.status = "playing"
-    this.users.forEach(user => { user.passed = false })
-    if (this.currentUser.hand.length === 0) {
-      this.nextPlayer()
-    }
-    this.sendGameState("gameStateChange")
-	}
-
-	public finishedHand(user: User): void {
-		this.finishedPlayers.push(user.username)
-
-		if (this.finishedPlayers.length === 1) {
-			const currentKing = this.users.find(user => user.position === "king")
-			if (currentKing) {
-				currentKing.position = "neutral"
-			}
-
-			user.position = "king"
-		} else if (this.players.length >= 4 && this.finishedPlayers.length == 2) {
-			const currentQueen = this.users.find(user => user.position === "queen")
-			if (currentQueen) {
-				currentQueen.position = "neutral"
-			}
-
-			user.position = "queen"
-		} else if (this.players.length >= 4 && this.finishedPlayers.length === this.players.length - 1) {
-			const currentViceScum = this.users.find(user => user.position === "vice-scum")
-			if (currentViceScum) {
-				currentViceScum.position = "scum"
-			}
-
-			user.position = "vice-scum"
-		} else if (this.finishedPlayers.length === this.players.length) {
-			user.position = "scum"
-		} else {
-			user.position = "neutral"
+		user.position = "king"
+	} else if (players(serverState).length >= 4 && serverState.finishedPlayers.length == 2) {
+		const currentQueen = serverState.users.find(user => user.position === "queen")
+		if (currentQueen) {
+			currentQueen.position = "neutral"
 		}
-	}
 
-	public sendGameState(type: "gameStart" | "gameStateChange" | "roundEnd"): void {
-		this.users.forEach(user => {
-			user.send({
-				type,
-				players: this.players,
-				currentPlayer: this.currentPlayer,
-				lastPlayer: this.lastPlayer,
-				board: this.board,
-				hand: user.hand
-			})
+		user.position = "queen"
+	} else if (players(serverState).length >= 4 && serverState.finishedPlayers.length === players(serverState).length - 1) {
+		const currentViceScum = serverState.users.find(user => user.position === "vice-scum")
+		if (currentViceScum) {
+			currentViceScum.position = "scum"
+		}
+
+		user.position = "vice-scum"
+	} else if (serverState.finishedPlayers.length === players(serverState).length) {
+		user.position = "scum"
+	} else {
+		user.position = "neutral"
+	}
+}
+
+export function sendGameState(serverState: ServerState, type: "gameStart" | "gameStateChange" | "roundEnd"): void {
+	serverState.users.forEach(user => {
+		send(user, {
+			type,
+			players: players(serverState),
+			currentPlayer: currentPlayer(serverState),
+			lastPlayer: serverState.lastPlayer,
+			board: serverState.board,
+			hand: user.hand
 		})
-	}
+	})
+}
 
-	public broadcast<T extends ServerToClientMessage>(message: T): void {
-		this.users.forEach(user => {
-			user.send(message)
-		})
-  }
+export function broadcast<T extends ServerToClientMessage>(serverState: ServerState, message: T): void {
+	serverState.users.forEach(user => {
+		send(user, message)
+	})
 }
 
 function shuffle<T>(array: T[]): T[] {

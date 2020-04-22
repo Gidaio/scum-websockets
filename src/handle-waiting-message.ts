@@ -1,12 +1,12 @@
-import { ServerState } from "./server-state"
-import { User } from "./user"
+import { ServerState, broadcast, initGame, sendGameState, userCount } from "./server-state"
+import { User, send } from "./user"
 
 
 export function handleWaitingMessage(user: User, message: ClientToServerMessage, serverState: ServerState): void {
 	switch (message.type) {
 		case "setReadyState": {
 			user.ready = message.ready
-			serverState.broadcast({
+			broadcast(serverState, {
 				type: "readyStateChange",
 				readyStates: serverState.users.reduce<{ [username: string]: boolean }>((readyStates, user) => ({
 					...readyStates,
@@ -18,8 +18,8 @@ export function handleWaitingMessage(user: User, message: ClientToServerMessage,
 		}
 
 		case "requestGameStart": {
-			if (serverState.userCount <= 1) {
-				user.send({
+			if (userCount(serverState) <= 1) {
+				send(user, {
 					type: "badRequest",
 					error: "Not enough players to start."
 				})
@@ -29,7 +29,7 @@ export function handleWaitingMessage(user: User, message: ClientToServerMessage,
 
 			for (const userToCheck of serverState.users) {
 				if (!userToCheck.ready) {
-					user.send({
+					send(user, {
 						type: "badRequest",
 						error: `${userToCheck.username} isn't ready.`
 					})
@@ -39,8 +39,8 @@ export function handleWaitingMessage(user: User, message: ClientToServerMessage,
 			}
 
 			serverState.status = "playing"
-			serverState.initGame()
-			serverState.sendGameState("gameStart")
+			initGame(serverState)
+			sendGameState(serverState, "gameStart")
 
 			break
 		}

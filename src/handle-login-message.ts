@@ -1,5 +1,5 @@
-import { ServerState } from "./server-state"
-import { User } from "./user"
+import { ServerState, addUser } from "./server-state"
+import { User, send } from "./user"
 
 import WebSocket from "ws"
 
@@ -8,9 +8,16 @@ export function handleLoginMessage(socket: WebSocket, message: ClientToServerMes
 	console.info("Handling login message...")
 	switch (message.type) {
 		case "loginRequest": {
-			const user = new User(message.username, socket)
-			serverState.addUser(user)
-			user.send({
+			const user: User = {
+				username: message.username,
+				socket,
+				ready: false,
+				hand: [],
+				passed: false,
+				position: "neutral"
+			}
+			addUser(serverState, user)
+			send(user, {
 				type: "loginAccepted",
 				username: message.username
 			})
