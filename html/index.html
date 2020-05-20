@@ -3,56 +3,39 @@
 <head>
 	<title>Scum</title>
 
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 	<style>
-		#game-board {
-			height: 72px;
+		body {
+			margin: 8px;
+			font-family: Arial, Helvetica, sans-serif;
 		}
 
-		.card {
-			font-size: 2rem;
-			-moz-user-select: none;
-			-webkit-user-select: none;
+		.flex-column {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
 		}
 
-		.red {
-			color: red;
+		.vertical-center {
+			height: 80vh;
+			justify-content: center;
 		}
 
-		.black {
-			color: black;
-		}
-
-		.selected {
-			color: blue;
+		.bottom-margin {
+			/* background-color: blue; */
+			margin-bottom: 10px;
 		}
 	</style>
 </head>
 
 <body>
-	<h1>Scum</h1>
-
-	<div id="login" hidden>
-		<input id="login-username" type="text">
-		<button id="login-submit" type="button">Login</button>
-		<p id="login-error"></p>
+	<div id="login" class="flex-column vertical-center">
+		<h1>Login</h1>
+		<form id="login-form" class="flex-column">
+			<input id="login-username" class="bottom-margin" type="text" placeholder="Username">
+			<button id="login-submit" type="submit">Login</button>
+		</form>
 	</div>
-
-	<div id="waiting-room" hidden>
-		<div id="waiting-room-players"></div>
-		<button id="waiting-room-ready-toggle" type="button"></button>
-		<button id="waiting-room-start-game" type="button">Start Game</button>
-	</div>
-
-	<div id="game" hidden>
-		<div id="game-players"></div>
-		<div id="game-board" ></div>
-		<div id="game-hand"></div>
-		<button id="game-play-cards" type="button">Play</button>
-		<button id="game-pass" type="button">Pass</button>
-		<button id="game-send" type="button" hidden>Send Cards</button>
-		<div id="game-message"></div>
-	</div>
-
-	<script src="scum.js"></script>
 </body>
 </html>
